@@ -58,7 +58,7 @@ aggregate_results.py       Tri-pillar aggregation and per-quadrant breakdown
 build_figures.py           Results figures
 build_report.py            Self-contained HTML results report
 demo/                      Small side-by-side comparison harness
-tests/                     558 tests
+tests/                     560 tests
 ```
 
 ## Running it
@@ -98,7 +98,11 @@ Set `LOCAL_TEST_THROTTLE=true` in `.env` to cap every loop at three items. Run e
 uv run pytest -q
 ```
 
-Tests marked `live` make real network calls and are skipped unless `RUN_LIVE_GROQ_TESTS=1`.
+A clean checkout runs green: 552 pass and 8 skip. The skips are the six
+calibration guards, which assert properties of a populated `golden_queries`
+table and have nothing to check until dataset generation has run, plus two
+tests marked `live`, which make real network calls and stay skipped unless
+`RUN_LIVE_GROQ_TESTS=1`.
 
 ## Model routing
 
