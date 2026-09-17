@@ -1,0 +1,43 @@
+[project]
+name = "rag-techniques-benchmark"
+version = "0.1.0"
+description = "Comparative benchmark of vector, BM25 and summary-tree RAG retrieval over SEC 10-K filings"
+readme = "README.md"
+requires-python = ">=3.13"
+dependencies = [
+    "aiosqlite>=0.22.1",
+    "chromadb>=1.5.9",
+    "fastembed>=0.7.4",
+    "groq>=1.5.0",
+    "llama-cloud-services>=0.6.94",
+    "llama-index-embeddings-fastembed>=0.6.0",
+    "llama-index-llms-groq>=0.5.0",
+    "llama-index-vector-stores-chroma>=0.5.5",
+    "matplotlib>=3.11.1",
+    "onnxruntime==1.23.2",
+    "python-dotenv>=1.2.2",
+    "rank-bm25>=0.2.2",
+    "requests>=2.34.2",
+    "tenacity>=9.1.4",
+    "tiktoken>=0.12.0",
+]
+
+[dependency-groups]
+dev = [
+    "pytest>=9.1.1",
+    "pytest-asyncio>=1.4.0",
+]
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+markers = [
+    "live: makes a real network call against the live Groq API; gated behind RUN_LIVE_GROQ_TESTS=1, never run by default `pytest -q`.",
+]
+
+[tool.rag-benchmark]
+# Resolved Phase 1 versions (recorded 2026-07-21, uv pip list):
+# groq==1.5.0
+# tenacity==9.1.4
+# aiosqlite==0.22.1
+# python-dotenv==1.2.2
+notes = "Re-verify LlamaIndex pins when touching ingestion or the retrieval pipelines."

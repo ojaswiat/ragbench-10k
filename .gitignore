@@ -1,0 +1,14 @@
+.venv/
+.env
+benchmark.db
+benchmark.db-wal
+benchmark.db-shm
+__pycache__/
+*.pyc
+storage/
+logs/
+data/raw/
+data/parsed/
+.pytest_cache/
+backups/
+artifacts/
