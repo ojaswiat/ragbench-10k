@@ -14,7 +14,7 @@ import pytest
 
 import build_findings_page as bfp
 
-PALETTE = Path(__file__).resolve().parents[2] / "resources" / "assets" / "design" / "palette.md"
+PALETTE = Path(__file__).resolve().parents[1] / "docs" / "design" / "palette.md"
 
 
 def _retrieved(pipeline: str, index: int) -> str:

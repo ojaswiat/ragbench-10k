@@ -14,7 +14,7 @@ import pytest
 
 import build_figures as bf
 
-PALETTE = Path(__file__).resolve().parents[2] / "resources" / "assets" / "design" / "palette.md"
+PALETTE = Path(__file__).resolve().parents[1] / "docs" / "design" / "palette.md"
 
 
 def _seed(path: Path) -> str:
