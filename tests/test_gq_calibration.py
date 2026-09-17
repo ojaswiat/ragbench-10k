@@ -4,6 +4,8 @@ These assert properties of the live golden_queries table rather than of a
 function: a mis-calibrated exemplar set silently corrupts every judge_score
 in the benchmark, and nothing else in the suite would catch it.
 """
+import sqlite3
+
 import pytest
 
 import database_manager as dbm
@@ -13,7 +15,15 @@ DB_PATH = "benchmark.db"
 
 @pytest.fixture
 async def golden_queries():
-    return await dbm.get_golden_queries(DB_PATH)
+    """Skips rather than errors when the table has not been built yet.
+
+    These guard the populated set, so on a clean checkout, before
+    ingestion and dataset generation have run, there is nothing to guard.
+    """
+    try:
+        return await dbm.get_golden_queries(DB_PATH)
+    except sqlite3.OperationalError:
+        pytest.skip("golden_queries not populated; run ingestion and dataset generation first")
 
 
 async def test_no_placeholder_labels_remain(golden_queries):
