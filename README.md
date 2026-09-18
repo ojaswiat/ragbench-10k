@@ -264,6 +264,60 @@ uv run python -m reporting.build_report
 - `build_report` writes `artifacts/results-report.html`, one self-contained file with the figures embedded in it.
 - **Order matters here.** `build_figures` must run before `build_report`, because the report embeds the images it finds on disk rather than drawing them itself.
 
+### What you get at the end
+
+`aggregate_results` prints five tables. These are the numbers from the original run:
+
+```
+==============================================================================
+BENCHMARK AGGREGATION: PQ, 900 cells
+==============================================================================
+
+OVERALL
+pipeline            n  judge   pass  recall   prec    hit   cite  tokF1    lat
+P2_bm25           300   4.02  0.743   0.706  0.326  0.840  0.773  0.295   6.18
+P1_vector         300   3.86  0.690   0.668  0.314  0.807  0.717  0.270   6.40
+P3_structural     300   1.88  0.213   0.181  0.070  0.207  0.357  0.138   6.87
+
+PAIRED COMPARISONS (paired on query_id and k_value)
+metric        comparison                      diff            95% CI      W/L/T        p  sig
+judge_score   P1_vector vs P2_bm25          -0.160  [-0.340, +0.013]  27/42/231 9.12e-02   no
+judge_score   P1_vector vs P3_structural    +1.977  [+1.743, +2.213] 169/11/120 1.64e-37  yes
+judge_score   P2_bm25 vs P3_structural      +2.137  [+1.897, +2.373] 180/12/108 1.26e-39  yes
+```
+
+The other three tables are **BY K**, the same metrics split across K = 2, 3 and 5; **BY QUADRANT**, split across the four question types; and **INDEX BUILD COST**, the one-off time and tokens each index took to build.
+
+Reading the columns:
+
+- **judge**: mean judge score, 1 to 5.
+- **pass**: fraction of answers scoring 4 or better.
+- **recall**, **prec**: recall@K and precision@K against the ground-truth nodes.
+- **hit**: fraction of questions where at least one correct node was retrieved.
+- **cite**: fraction where the nodes the answer cited were all in the ground truth.
+- **tokF1**: token overlap between the answer and the reference answer.
+- **lat**: mean seconds per answer.
+- **diff**, **95% CI**, **W/L/T**, **p**, **sig**: the paired difference between two pipelines, its interval, win/loss/tie counts, the p-value, and whether the interval clears zero.
+
+`build_figures` then prints six lines:
+
+```
+wrote artifacts/figures/figure-5-1-answer-quality.png
+wrote artifacts/figures/figure-5-2-retrieval-quality.png
+wrote artifacts/figures/figure-5-3-effect-of-k.png
+wrote artifacts/figures/figure-5-4-by-quadrant.png
+wrote artifacts/figures/figure-5-5-score-distribution.png
+wrote artifacts/figures/figure-5-6-paired-comparisons.png
+```
+
+And `build_report` prints one:
+
+```
+wrote artifacts/results-report.html (952 KB)
+```
+
+That last line is the end of the run. **The report is the deliverable**: open `artifacts/results-report.html` in a browser and you get the whole thing as one self-contained page, with all six figures embedded and the tables written out in prose.
+
 ### What you will and will not reproduce
 
 - You **will not** get the exact numbers in this README. The question set is model-generated, so a fresh run writes a different 140 questions and the scores move with them.
