@@ -10,7 +10,7 @@ no API key is read and no free-tier quota is spent.
 import argparse
 import asyncio
 
-import database_manager as dbm
+from core import database_manager as dbm
 
 from demo import report
 from demo.compare import aggregate, build_retrievers, load_demo_queries, run_query

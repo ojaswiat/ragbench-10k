@@ -17,7 +17,7 @@ matplotlib.use("Agg")  # No display in this environment; render straight to file
 import matplotlib.pyplot as plt
 from matplotlib.patches import Patch
 
-import aggregate_results as agg
+from analysis import aggregate_results as agg
 
 # Oxford Ink, section 2.1 categorical order. Three series, so the first three
 # entries: each pipeline keeps one colour across every figure.

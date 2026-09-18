@@ -33,7 +33,7 @@ import random
 import sqlite3
 from collections import defaultdict
 
-import index_build_cost
+from analysis import index_build_cost
 
 # A judged answer counts as a pass at 4 or better: correct on the value, with
 # at most a shortfall in completeness or framing. See judge/async_judge.py.

@@ -10,7 +10,7 @@ of the calibration."""
 import asyncio
 import re
 
-import database_manager as dbm
+from core import database_manager as dbm
 
 _ENTRY_RE = re.compile(
     r"^## (?P<query_id>\S+)\n\n"

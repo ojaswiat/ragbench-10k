@@ -1,7 +1,7 @@
 import importlib
 
 import llm_client.config as config
-import loop_template
+from core import loop_template
 
 
 def test_throttle_limit_clause_matches_config():

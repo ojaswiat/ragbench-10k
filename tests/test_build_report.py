@@ -13,8 +13,8 @@ from pathlib import Path
 
 import pytest
 
-import build_report as br
-import index_build_cost as ibc
+from reporting import build_report as br
+from analysis import index_build_cost as ibc
 
 # The smallest bytes that are a valid PNG: an 8x8 greyscale image. The
 # report only base64-embeds these, so the pixels never matter, but a real
@@ -147,7 +147,7 @@ def test_the_structural_diagnosis_quotes_computed_figures_not_literals(benchmark
     reintroduced literal fail rather than merely go stale.
     """
     import sqlite3 as _sqlite3
-    import retrieval_diagnostics as diag
+    from analysis import retrieval_diagnostics as diag
     expected = diag.diagnose_all(_sqlite3.connect(benchmark_db))
     html = br.build_html(benchmark_db, figures, build_cost_path=tmp_path / "absent.json")
     for pipeline in ("P1_vector", "P2_bm25", "P3_structural"):

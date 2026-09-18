@@ -13,7 +13,7 @@ import tiktoken
 from openai import APIError
 
 import llm_client.config as config
-import database_manager as dbm
+from core import database_manager as dbm
 from dataset_generation.async_critic import critique_query
 from dataset_generation.async_generator import generate_query
 from dataset_generation.cross_check import check_query, diagnose_rejection, embedding_similarity

@@ -11,9 +11,9 @@ import argparse
 import asyncio
 import logging
 
-import database_manager as dbm
+from core import database_manager as dbm
 import llm_client.config as config
-from loop_template import apply_throttle
+from core.loop_template import apply_throttle
 from pipelines.answerer import Answerer
 from pipelines.base import Retriever
 

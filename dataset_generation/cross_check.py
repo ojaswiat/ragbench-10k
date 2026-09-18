@@ -7,7 +7,7 @@ citations, on the numbers in the answer and on the answer's overall meaning.
 import re
 
 from fastembed import TextEmbedding
-from model_cache import model_cache_dir
+from core.model_cache import model_cache_dir
 
 _NUMBER_RE = re.compile(r"-?\d[\d,]*\.?\d*")
 

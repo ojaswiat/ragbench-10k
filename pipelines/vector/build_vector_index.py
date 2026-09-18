@@ -14,10 +14,10 @@ from llama_index.core.schema import NodeRelationship, RelatedNodeInfo
 from llama_index.embeddings.fastembed import FastEmbedEmbedding
 from llama_index.vector_stores.chroma import ChromaVectorStore
 
-import database_manager as dbm
-import loop_template
+from core import database_manager as dbm
+from core import loop_template
 from pipelines.structural.node_convert import nodes_to_llama_nodes
-from model_cache import model_cache_dir
+from core.model_cache import model_cache_dir
 
 STORAGE_ROOT = Path("storage/chroma")
 COLLECTION_NAME = "p1_vector"

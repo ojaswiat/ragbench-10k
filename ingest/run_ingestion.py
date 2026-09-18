@@ -4,8 +4,8 @@ for every filing in data/filings_manifest.json, honouring LOCAL_TEST_THROTTLE.
 import asyncio
 import json
 
-import database_manager as dbm
-import loop_template
+from core import database_manager as dbm
+from core import loop_template
 from ingest.fetch_filings import fetch_filing
 from ingest.node_builder import build_nodes
 from ingest.parse_filing import parse_filing

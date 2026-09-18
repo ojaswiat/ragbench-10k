@@ -12,7 +12,7 @@ import sqlite3
 
 import pytest
 
-import retrieval_diagnostics as rd
+from analysis import retrieval_diagnostics as rd
 
 
 def _seed(directory, rows, gold=None, sizes=(("A", 10), ("B", 100))):

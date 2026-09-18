@@ -10,7 +10,7 @@ import sqlite3
 
 import pytest
 
-import aggregate_results as agg
+from analysis import aggregate_results as agg
 
 
 def _row(query_id, pipeline, k_value, judge=None, recall=None, **extra):

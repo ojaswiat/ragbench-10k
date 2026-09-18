@@ -16,7 +16,7 @@ from llama_index.embeddings.fastembed import FastEmbedEmbedding
 import pipelines.structural.build_summary_index as bsi
 from pipelines.base import Retriever
 from pipelines.vector.build_vector_index import EMBED_MODEL_NAME
-from model_cache import model_cache_dir
+from core.model_cache import model_cache_dir
 
 _RETRIEVER_MODE = "select_leaf_embedding"
 

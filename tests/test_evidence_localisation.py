@@ -11,7 +11,7 @@ import sqlite3
 
 import pytest
 
-import evidence_localisation as el
+from analysis import evidence_localisation as el
 
 
 def _row(citations, answer, query="What is the value?"):

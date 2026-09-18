@@ -1,6 +1,6 @@
 import pytest
 
-import database_manager as dbm
+from core import database_manager as dbm
 import ingest.parsing_audit as parsing_audit
 
 TEST_DB = "test_audit.db"

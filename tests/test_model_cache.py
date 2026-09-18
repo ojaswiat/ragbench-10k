@@ -9,7 +9,7 @@ from __future__ import annotations
 import ast
 import pathlib
 
-import model_cache
+from core import model_cache
 
 
 def test_default_is_outside_the_repo_and_outside_temp():

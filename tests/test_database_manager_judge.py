@@ -8,7 +8,7 @@ import os
 
 import pytest
 
-import database_manager as dbm
+from core import database_manager as dbm
 
 TEST_DB = "test_benchmark_judge.db"
 

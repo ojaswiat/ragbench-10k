@@ -1,4 +1,4 @@
-# ragbench-10k
+# RAGBench-10K
 
 A controlled comparison of three retrieval paradigms for retrieval-augmented generation, evaluated on SEC 10-K annual reports.
 
@@ -42,23 +42,28 @@ The judge is gated before it is trusted. It scores the 60 JEQ outputs (20 querie
 ## Layout
 
 ```
-database_manager.py        SQLite state layer (nodes, queries, golden_queries,
-                           judge_validation, results), WAL mode, resumable
-llm_client/                Per-provider async clients behind one LLMFactory,
-                           with backoff, jitter and a concurrency semaphore
-ingest/                    EDGAR fetch, parsing, node construction, parse audit
-dataset_generation/        Generator, critic with search tool, cross-check,
-                           GQ labelling
-pipelines/                 base retriever, shared answerer, and vector/ bm25/
-                           structural/ implementations plus their index builders
-judge/                     Judge prompt assembly, deterministic metrics,
-                           numeric normalisation
-loop_executor.py           Runs the benchmark matrix, committing per row
-aggregate_results.py       Tri-pillar aggregation and per-quadrant breakdown
-build_figures.py           Results figures
-build_report.py            Self-contained HTML results report
-demo/                      Small side-by-side comparison harness
-tests/                     560 tests
+core/                SQLite state layer (nodes, queries, golden_queries,
+                     judge_validation, results) in WAL mode, the shared
+                     throttle helpers, and the durable embedding-model cache
+llm_client/          Per-provider async clients behind one LLMFactory, with
+                     backoff, jitter and a concurrency semaphore
+ingest/              EDGAR fetch, parsing, node construction, parse audit
+dataset_generation/  Generator, critic with search tool, cross-check, and the
+                     golden-query labelling tools
+pipelines/           Base retriever, shared answerer, and vector/ bm25/
+                     structural/ implementations plus their index builders
+judge/               Judge prompt assembly, deterministic metrics, numeric
+                     normalisation
+benchmark/           Runs the 900-cell matrix, committing per row, held behind
+                     the judge gate
+gate/                Scores the 60 gate outputs and reports concordance
+analysis/            Tri-pillar aggregation, per-quadrant breakdown, retrieval
+                     diagnostics, evidence localisation, index build cost
+reporting/           Figures, the self-contained HTML results report, and the
+                     standalone findings page
+scripts/             Backup, reload, and answer-key repair
+demo/                Small side-by-side comparison harness
+tests/               560 tests
 ```
 
 ## Running it
@@ -85,9 +90,9 @@ uv run python -m pipelines.structural.build_summary_index
 uv run python -m dataset_generation.run_dataset_generation
 
 # Run the benchmark, then aggregate
-uv run python loop_executor.py
-uv run python aggregate_results.py
-uv run python build_report.py
+uv run python -m benchmark.loop_executor
+uv run python -m analysis.aggregate_results
+uv run python -m reporting.build_report
 ```
 
 Set `LOCAL_TEST_THROTTLE=true` in `.env` to cap every loop at three items. Run every stage that way first. The `results` table has a uniqueness constraint on `(source_set, query_id, pipeline, k_value)`, so an interrupted run resumes from the last committed row rather than re-spending quota.

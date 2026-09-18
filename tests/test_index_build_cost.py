@@ -13,8 +13,8 @@ from pathlib import Path
 
 import pytest
 
-import aggregate_results as agg
-import index_build_cost as ibc
+from analysis import aggregate_results as agg
+from analysis import index_build_cost as ibc
 
 
 def _attempt(document_id, seconds, inp=10, out=5):

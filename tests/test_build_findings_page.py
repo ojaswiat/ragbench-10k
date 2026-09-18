@@ -12,7 +12,7 @@ from pathlib import Path
 
 import pytest
 
-import build_findings_page as bfp
+from reporting import build_findings_page as bfp
 
 PALETTE = Path(__file__).resolve().parents[1] / "docs" / "design" / "palette.md"
 

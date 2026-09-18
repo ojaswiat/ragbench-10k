@@ -10,7 +10,7 @@ from pathlib import Path
 
 from llama_index.core.schema import NodeWithScore, TextNode
 
-import database_manager as dbm
+from core import database_manager as dbm
 import pipelines.bm25.build_bm25_index as bbi
 from pipelines.base import Retriever
 from pipelines.bm25.tokenizer import tokenize

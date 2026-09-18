@@ -10,9 +10,9 @@ import os
 
 import pytest
 
-import database_manager as dbm
-import gate_reference_scores
-import score_gate_outputs as sg
+from core import database_manager as dbm
+from gate import gate_reference_scores
+from gate import score_gate_outputs as sg
 
 TEST_DB = "test_benchmark_score_gate.db"
 

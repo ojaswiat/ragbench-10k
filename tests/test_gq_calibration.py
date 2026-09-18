@@ -8,7 +8,7 @@ import sqlite3
 
 import pytest
 
-import database_manager as dbm
+from core import database_manager as dbm
 
 DB_PATH = "benchmark.db"
 

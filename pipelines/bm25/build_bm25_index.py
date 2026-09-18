@@ -12,8 +12,8 @@ from pathlib import Path
 
 from rank_bm25 import BM25Okapi
 
-import database_manager as dbm
-import loop_template
+from core import database_manager as dbm
+from core import loop_template
 from pipelines.bm25.tokenizer import tokenize
 
 STORAGE_ROOT = Path("storage/bm25")

@@ -22,7 +22,7 @@ import json
 import sqlite3
 import sys
 
-import evidence_localisation as el
+from analysis import evidence_localisation as el
 from judge.async_judge import compute_deterministic_metrics
 
 # Tables holding answer keys the rule applies to. golden_queries is excluded

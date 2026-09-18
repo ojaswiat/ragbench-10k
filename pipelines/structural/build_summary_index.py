@@ -14,8 +14,8 @@ from pathlib import Path
 from llama_index.core import TreeIndex
 from llama_index.core.callbacks import CallbackManager, TokenCountingHandler
 
-import database_manager as dbm
-import loop_template
+from core import database_manager as dbm
+from core import loop_template
 from pipelines.structural.node_convert import nodes_to_llama_nodes
 from llm_client.llm_factory import LLMFactory
 

@@ -8,7 +8,7 @@ from fastembed.rerank.cross_encoder import TextCrossEncoder
 from llama_index.core.bridge.pydantic import PrivateAttr
 from llama_index.core.postprocessor.types import BaseNodePostprocessor
 from llama_index.core.schema import MetadataMode, NodeWithScore, QueryBundle
-from model_cache import model_cache_dir
+from core.model_cache import model_cache_dir
 
 
 class FastEmbedReranker(BaseNodePostprocessor):

@@ -38,7 +38,7 @@ import asyncio
 import logging
 import random
 
-import database_manager as dbm
+from core import database_manager as dbm
 
 logger = logging.getLogger(__name__)
 

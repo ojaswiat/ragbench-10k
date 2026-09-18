@@ -11,10 +11,10 @@ from unittest.mock import AsyncMock
 import pytest
 from llama_index.core.schema import NodeWithScore, TextNode
 
-import database_manager as dbm
+from core import database_manager as dbm
 import llm_client.config as config
-import loop_executor
-import loop_template
+from benchmark import loop_executor
+from core import loop_template
 from pipelines.answerer import AnswerResult
 from pipelines.base import Retriever
 

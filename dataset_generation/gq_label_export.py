@@ -10,7 +10,7 @@ example_output exactly as write_gq_labels.py left it, silently mismatching
 the two halves of the calibration."""
 import asyncio
 
-import database_manager as dbm
+from core import database_manager as dbm
 
 
 def render_label_markdown(golden_queries: list[dict]) -> str:

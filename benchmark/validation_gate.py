@@ -12,7 +12,7 @@ import argparse
 import asyncio
 import logging
 
-import loop_executor
+from benchmark import loop_executor
 from judge.async_judge import judge_jeq_rows
 from pipelines.answerer import Answerer
 from pipelines.base import Retriever

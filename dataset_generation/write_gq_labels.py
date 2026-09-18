@@ -16,7 +16,7 @@ Idempotent: re-running it rewrites the same values.
 """
 import asyncio
 
-import database_manager as dbm
+from core import database_manager as dbm
 
 LABELS: list[dict] = [
     # ------------------------------------------------------------------

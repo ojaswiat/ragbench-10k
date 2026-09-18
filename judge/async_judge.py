@@ -14,11 +14,11 @@ import re
 
 from llama_index.core.base.llms.types import ChatMessage, MessageRole
 
-import database_manager as dbm
+from core import database_manager as dbm
 import llm_client.config as config
 from judge.metrics import citation_audit, exact_match, precision_at_k, recall_at_k, token_f1
 from llm_client.llm_factory import LLMFactory
-from loop_template import LOCAL_TEST_THROTTLE, apply_throttle
+from core.loop_template import LOCAL_TEST_THROTTLE, apply_throttle
 
 logger = logging.getLogger(__name__)
 

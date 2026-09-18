@@ -10,7 +10,7 @@ import asyncio
 import json
 import time
 
-import database_manager as dbm
+from core import database_manager as dbm
 from judge.metrics import precision_at_k, recall_at_k
 from pipelines.bm25.p2_bm25 import P2BM25Retriever
 from pipelines.structural.p3_structural import P3StructuralRetriever

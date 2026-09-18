@@ -13,7 +13,7 @@ import sqlite3
 
 import pytest
 
-import database_manager as dbm
+from core import database_manager as dbm
 from judge.async_judge import judge_rows, rubric_fingerprint
 
 TEST_DB = "test_benchmark_judge_resume.db"

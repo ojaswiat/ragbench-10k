@@ -18,7 +18,7 @@ from llama_index.vector_stores.chroma import ChromaVectorStore
 import pipelines.vector.build_vector_index as bvi
 from pipelines.base import Retriever
 from pipelines.vector.fastembed_reranker import FastEmbedReranker
-from model_cache import model_cache_dir
+from core.model_cache import model_cache_dir
 
 _PREFETCH_MULTIPLIER = 4
 _MIN_PREFETCH = 20

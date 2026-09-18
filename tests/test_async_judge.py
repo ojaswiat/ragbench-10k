@@ -15,7 +15,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 from llama_index.llms.openai_like import OpenAILike
 
-import database_manager as dbm
+from core import database_manager as dbm
 from judge import async_judge
 from judge.async_judge import (
     Judge,

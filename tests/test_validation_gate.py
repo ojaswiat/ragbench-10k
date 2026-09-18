@@ -9,7 +9,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-import validation_gate
+from benchmark import validation_gate
 
 
 @pytest.mark.asyncio

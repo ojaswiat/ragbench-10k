@@ -14,9 +14,9 @@ import sqlite3
 from datetime import date
 from pathlib import Path
 
-import aggregate_results as agg
-import build_figures as bf
-import retrieval_diagnostics as diag
+from analysis import aggregate_results as agg
+from reporting import build_figures as bf
+from analysis import retrieval_diagnostics as diag
 
 PIPELINE_LABELS = bf.PIPELINE_LABELS
 QUADRANT_TITLES = {
