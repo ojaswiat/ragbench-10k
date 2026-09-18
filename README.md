@@ -62,27 +62,59 @@ analysis/            Tri-pillar aggregation, per-quadrant breakdown, retrieval
 reporting/           Figures, the self-contained HTML results report, and the
                      standalone findings page
 scripts/             Backup, reload, and answer-key repair
-demo/                Small side-by-side comparison harness
+demo/                Zero-key side-by-side harness, plus the node store and
+                     summary tree it ships for its one filing
 tests/               560 tests
 ```
 
 ## Running it
 
-Requires Python 3.13 and [uv](https://docs.astral.sh/uv/).
+Requires Python 3.13 and [uv](https://docs.astral.sh/uv/). Run every command from the repository root: `benchmark.db`, `storage/` and `artifacts/` are all resolved relative to the working directory.
 
 ```bash
 uv sync
-cp .env.example .env   # then fill in your API keys
 ```
 
-Run every command from the repository root. Paths such as `benchmark.db`,
-`storage/` and `artifacts/` are resolved relative to the working directory.
-
-Retrieval and indexing run locally on CPU. Only dataset generation, answering and judging call out to a model, all on free tiers.
+### See it working, in about two minutes, with no API key
 
 ```bash
-# 1. Fetch and parse the filings into the node store. This creates
-#    benchmark.db and its five tables on first run.
+uv run python -m demo.main
+```
+
+This is the fastest way to see what the project actually does. It takes one filing, Microsoft's FY2023 10-K, picks one query from each of the four difficulty quadrants, and sends each query through all three retrieval pipelines at K = 3. For every query it prints the ranked evidence each pipeline returned, marks which nodes are in the ground truth, and scores precision@3 and recall@3 against the stored citations.
+
+**It makes no API calls and reads no key.** All three retrievers run locally: P1 embeds on CPU, P2 is pure BM25 arithmetic, and P3 walks its tree with a MockLLM bound in place of a real one. Precision and recall here are set arithmetic against citations already stored with the query, not a model's judgement.
+
+Two of the demo's inputs cannot be regenerated offline, so they ship with the repository in `demo/assets/` (2.3 MB total):
+
+- The node store for that one filing, which is the output of a paid parse of the source document.
+- Its P3 summary tree, which was built by driving an LLM over every node.
+
+The demo copies both into place on first run and leaves an existing `benchmark.db` untouched. The P1 and P2 indexes are not shipped, because they build locally in seconds from the nodes.
+
+Expect roughly two minutes the first time, most of it downloading the `bge-small` embedder and the reranker and embedding 1,103 nodes. Subsequent runs take about 45 seconds, since both indexes are then cached on disk.
+
+The demo ends by saying plainly that four queries on one filing is an illustration of the mechanism and not a finding. The finding is the 900-run benchmark below.
+
+### Full reproduction, with your own API keys
+
+```bash
+cp .env.example .env   # then fill in your keys
+```
+
+| Variable | Used for | Where to get one |
+|---|---|---|
+| `GROQ_API_KEY` | Pipeline answerer and the judge | [console.groq.com](https://console.groq.com/keys) |
+| `OPENROUTER_API_KEY` | Query generator and critic | [openrouter.ai/keys](https://openrouter.ai/keys) |
+| `NIM_API_KEY` | The P3 summary tree build | [build.nvidia.com](https://build.nvidia.com) |
+| `LLAMA_CLOUD_API_KEY` | Parsing the filings | [cloud.llamaindex.ai](https://cloud.llamaindex.ai/api-key) |
+| `SEC_EDGAR_USER_AGENT` | Not a key: the contact string EDGAR requires | Your own `"name email"` |
+
+**`LOCAL_TEST_THROTTLE` defaults to `true`.** While it is on, every stage caps at three items: three filings ingested and indexed, three sections generated, three benchmark cells, three judge rows. That is the right way to check the plumbing end to end for a few pennies of quota, and it is what you want on a first pass. It is not a run of the benchmark. Set it to `false` in `.env` for the real thing.
+
+```bash
+# 1. Fetch and parse the filings into the node store. Creates benchmark.db
+#    and its five tables on first run.
 uv run python -m ingest.run_ingestion
 
 # 2. Build the three indexes. The first two are local and free; the third
@@ -112,9 +144,11 @@ uv run python -m reporting.build_figures
 uv run python -m reporting.build_report
 ```
 
-Two ordering constraints are easy to miss. The judge gate at step 4 exists to be passed before step 5 is started, since the full run is what spends the quota. And `build_figures` must run before `build_report`, which embeds whatever `figure-5-*.png` it finds in `artifacts/figures` rather than rendering them itself.
+Two ordering constraints are easy to miss. The judge gate at step 4 exists to be cleared before step 5 starts, because step 5 is what spends the quota. And `build_figures` must run before `build_report`, which embeds whatever `figure-5-*.png` it finds in `artifacts/figures` rather than rendering them itself.
 
-Set `LOCAL_TEST_THROTTLE=true` in `.env` to cap every loop at three items. Run every stage that way first. The `results` table has a uniqueness constraint on `(source_set, query_id, pipeline, k_value)`, so an interrupted run resumes from the last committed row rather than re-spending quota.
+Step 5 is resumable. The `results` table is unique on `(source_set, query_id, pipeline, k_value)`, so an interrupted run reads back what it already committed and skips those cells rather than paying for them twice.
+
+Be aware that a full reproduction will not reproduce the exact numbers in this README. The query set is model-generated, so a fresh run produces a different 140 queries, and the scores move with them. What should reproduce is the shape of the result: P1 and P2 close enough to be indistinguishable, P3 clearly behind on the table-sourced quadrants.
 
 ### Optional steps
 
@@ -161,4 +195,6 @@ Generator and critic are different families, and the answerer and judge are diff
 
 ## Not in this repository
 
-Generated artefacts are excluded to keep the repository small: the raw and parsed filings under `data/`, the built indexes under `storage/`, run logs, and `benchmark.db` itself. All of them are reproducible from the commands above. `data/filings_manifest.json` records exactly which filings the corpus is pinned to.
+Generated artefacts are excluded to keep the repository small: the raw and parsed filings under `data/`, the built indexes under `storage/`, run logs, and `benchmark.db` itself. All of them are reproducible from the commands above, and `data/filings_manifest.json` records exactly which filings the corpus is pinned to.
+
+The one deliberate exception is `demo/assets/`, which carries the node store and P3 summary tree for a single filing, 2.3 MB in total. Those two cannot be regenerated without a paid parse and a run of LLM calls, and without them the demo cannot run at all, which would leave nothing in the repository that a reader can execute.
