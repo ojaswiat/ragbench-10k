@@ -61,7 +61,7 @@ The judge has to earn its place before it grades anything. It scores 60 validati
 ### Steps
 
 ```bash
-git clone <your-repo-url> ragbench-10k
+git clone git@github.com:ojaswiat/ragbench-10k.git ragbench-10k
 cd ragbench-10k
 uv sync
 uv run python -m demo.main
@@ -142,6 +142,14 @@ All four services have a free tier. The project is built to stay inside them.
 - Set it to `false` in `.env` when you want the real run.
 - Run every command from the repository root. Paths are worked out from your working directory.
 - Steps 2 and 6 are the expensive ones. Everything else is cheap or free.
+
+**If you ran the demo first, clear its state before you start.** The demo seeds `benchmark.db` with the nodes and 16 questions for its one filing, and ingestion skips any filing that already has nodes. Left in place, those 16 would be counted towards the question set and you would end up with a mix of bundled and freshly generated questions.
+
+```bash
+rm -rf benchmark.db benchmark.db-wal benchmark.db-shm storage artifacts
+```
+
+Delete both or neither. Keeping `storage/` while deleting the database leaves a summary tree pointing at node IDs that no longer exist. Nothing here is precious: the demo rebuilds its own state the next time you run it.
 
 ---
 
