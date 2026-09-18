@@ -13,6 +13,7 @@ import asyncio
 from core import database_manager as dbm
 
 from demo import report
+from demo.bootstrap import ensure_demo_data
 from demo.compare import aggregate, build_retrievers, load_demo_queries, run_query
 from demo.config import DB_PATH, DEMO_DOCUMENT, K, PIPELINES, RULE
 from demo.indexes import ensure_indexes
@@ -21,6 +22,8 @@ from demo.indexes import ensure_indexes
 async def main(document_id: str = DEMO_DOCUMENT, k: int = K) -> int:
     report.banner("RAG RETRIEVAL BENCHMARK   ·   LIVE DEMO",
                   "Three paradigms, one filing, one query per quadrant")
+
+    ensure_demo_data(document_id)
 
     nodes = await dbm.get_nodes_by_document(DB_PATH, document_id)
     queries = await load_demo_queries(document_id=document_id)

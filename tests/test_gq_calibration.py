@@ -15,15 +15,22 @@ DB_PATH = "benchmark.db"
 
 @pytest.fixture
 async def golden_queries():
-    """Skips rather than errors when the table has not been built yet.
+    """Skips rather than errors when the set has not been built yet.
 
-    These guard the populated set, so on a clean checkout, before
-    ingestion and dataset generation have run, there is nothing to guard.
+    These guard a populated calibration set, so until dataset generation
+    and write_gq_labels have run there is nothing here to guard. Three
+    states mean the same thing and all skip: no database file, no table,
+    and an empty table. The last is the one the demo leaves behind, since
+    its bundled database carries the full schema but only the nodes and
+    queries for the single demo filing.
     """
     try:
-        return await dbm.get_golden_queries(DB_PATH)
+        rows = await dbm.get_golden_queries(DB_PATH)
     except sqlite3.OperationalError:
-        pytest.skip("golden_queries not populated; run ingestion and dataset generation first")
+        rows = []
+    if not rows:
+        pytest.skip("golden_queries not populated; run dataset generation, then write_gq_labels")
+    return rows
 
 
 async def test_no_placeholder_labels_remain(golden_queries):
