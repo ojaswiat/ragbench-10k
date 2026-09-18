@@ -88,15 +88,31 @@ uv run python -m demo.main
 
 ### What you should see
 
-The three pipelines disagreeing about the same four questions, which is the whole point of the project:
+For each of the four questions the run prints the ground-truth node, then the three nodes each pipeline returned, with a `*` marking the ones that were correct. It ends with this summary:
 
 ```
-  P1  semantic               0.42        0.69           5.04s
+==============================================================================
+  SUMMARY   ·   mean over 4 queries at K=3
+==============================================================================
+                      Precision@3    Recall@3    Mean latency
+                   ------------------------------------------
+  P1  semantic               0.42        0.69           4.94s
   P2  statistical            0.50        0.75           0.02s
-  P3  structural             0.00        0.00           3.96s
+  P3  structural             0.00        0.00           3.88s
 ```
 
-P1 and P2 land close together. P3 misses on all four. That is the headline result in miniature.
+Reading the columns:
+
+- **Precision@3**: of the three nodes a pipeline returned, the fraction that were in the ground truth. Higher is better.
+- **Recall@3**: of the nodes the ground truth lists, the fraction the pipeline found. Higher is better.
+- **Mean latency**: average time to retrieve the evidence for one question.
+
+What it tells you:
+
+- P1 and P2 land close together, which is the headline result in miniature.
+- P3 misses on all four questions, so it scores zero on both measures.
+- P2 is two orders of magnitude faster than P1, because it runs no model and does no embedding.
+- Your latency figures will differ, since they depend on your machine. The pattern should not.
 
 ### Why two files ship with the repository
 
