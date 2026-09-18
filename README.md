@@ -75,27 +75,63 @@ uv sync
 cp .env.example .env   # then fill in your API keys
 ```
 
-Retrieval and indexing run locally on CPU. Only generation, dataset creation and judging call out to a model, all on free tiers.
+Run every command from the repository root. Paths such as `benchmark.db`,
+`storage/` and `artifacts/` are resolved relative to the working directory.
+
+Retrieval and indexing run locally on CPU. Only dataset generation, answering and judging call out to a model, all on free tiers.
 
 ```bash
-# Ingest filings and build the node store
+# 1. Fetch and parse the filings into the node store. This creates
+#    benchmark.db and its five tables on first run.
 uv run python -m ingest.run_ingestion
 
-# Build the three indexes
+# 2. Build the three indexes. The first two are local and free; the third
+#    drives an LLM over every node and is the one that costs real quota.
 uv run python -m pipelines.vector.build_vector_index
 uv run python -m pipelines.bm25.build_bm25_index
 uv run python -m pipelines.structural.build_summary_index
 
-# Generate and verify the query set
+# 3. Generate and verify the 140 queries, then apply the judge's
+#    calibration labels to the 20 golden ones.
 uv run python -m dataset_generation.run_dataset_generation
+uv run python -m dataset_generation.write_gq_labels
 
-# Run the benchmark, then aggregate
+# 4. The judge gate. Concordance must exceed 80% before the full run is
+#    worth starting; below that, retune the rubric or swap the judge model.
+uv run python -m benchmark.validation_gate     # 60 gate rows, judge-scored
+uv run python -m gate.gate_reference_scores    # independent reference scores
+uv run python -m gate.score_gate_outputs       # the concordance check
+
+# 5. The 900-cell matrix. Paced across days against free-tier ceilings,
+#    and resumable after an interruption.
 uv run python -m benchmark.loop_executor
+
+# 6. Aggregate, then render.
 uv run python -m analysis.aggregate_results
+uv run python -m reporting.build_figures
 uv run python -m reporting.build_report
 ```
 
+Two ordering constraints are easy to miss. The judge gate at step 4 exists to be passed before step 5 is started, since the full run is what spends the quota. And `build_figures` must run before `build_report`, which embeds whatever `figure-5-*.png` it finds in `artifacts/figures` rather than rendering them itself.
+
 Set `LOCAL_TEST_THROTTLE=true` in `.env` to cap every loop at three items. Run every stage that way first. The `results` table has a uniqueness constraint on `(source_set, query_id, pipeline, k_value)`, so an interrupted run resumes from the last committed row rather than re-spending quota.
+
+### Optional steps
+
+To hand-write the golden-query labels instead of using the committed calibration set, export a template, fill it in, and read it back:
+
+```bash
+uv run python -m dataset_generation.gq_label_export   # writes golden_queries_to_label.md
+uv run python -m dataset_generation.gq_label_import   # reads it back
+```
+
+To regenerate the index build cost snapshot rather than using the committed `data/index_build_costs.json`:
+
+```bash
+uv run python -m analysis.index_build_cost
+```
+
+That one re-measures P1 and P2 by rebuilding into a scratch directory, and reads P3's cost back from the append-only log its build wrote, since provider queueing cannot be replayed.
 
 ### Tests
 
