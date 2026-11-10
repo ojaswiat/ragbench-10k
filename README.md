@@ -670,6 +670,6 @@ The SEC filings the benchmark runs on are US government publications and are in 
 
 Ojaswi Athghara
 
-- Email: [ojaswiat@gmail.com](mailto:ojaswiat@gmail.com)
-- GitHub: [github.com/ojaswiat](https://github.com/ojaswiat)
-- LinkedIn: [linkedin.com/in/ojaswiat](https://linkedin.com/in/ojaswiat)
+- Email: <a href="mailto:ojaswiat@gmail.com" target="_blank">ojaswiat@gmail.com</a>
+- GitHub: <a href="https://github.com/ojaswiat" target="_blank" rel="noopener noreferrer">github.com/ojaswiat</a>
+- LinkedIn: <a href="https://linkedin.com/in/ojaswiat" target="_blank" rel="noopener noreferrer">linkedin.com/in/ojaswiat</a>
