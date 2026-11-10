@@ -1,14 +1,43 @@
 # RAGBench-10K
 
-A controlled comparison of three ways of retrieving evidence for a question, tested on real SEC 10-K annual reports.
+[![Python 3.13](https://img.shields.io/badge/python-3.13-blue.svg)](https://www.python.org/)
+[![Licence: MIT](https://img.shields.io/badge/licence-MIT-green.svg)](LICENSE)
+[![Tests: 552 passed, 8 skipped](https://img.shields.io/badge/tests-552%20passed%2C%208%20skipped-brightgreen.svg)](#tests)
+
+**A controlled benchmark of three retrieval paradigms, vector, BM25 and summary-tree, over 13 SEC 10-K filings, with generation held fixed so only retrieval varies.**
+
+## TL;DR
+
+- **BM25 is statistically indistinguishable from a dense retriever plus reranker at this sample size.** BM25 scores 4.02 and vector 3.86 on a 1 to 5 judge scale. The paired difference is -0.160 with a 95% interval of [-0.340, +0.013], which crosses zero.
+- **The summary-tree pipeline scores 1.88, around two judge points lower**, and its intervals sit well clear of zero. In 214 of its 300 cells it answered that the sources did not contain the answer, against 60 for BM25 and 62 for vector.
+- **The build costs span more than four orders of magnitude.** Under 1 second for BM25, 22 minutes for the vector index, and 10.6 hours plus 1.6M input and 892K output tokens for the summary trees.
+
+**Scale:** 13 filings, 5 companies, 18,297 nodes, 140 questions of which 100 are scored, 900 benchmark cells, one run per cell at temperature 0. The judge cleared its 80% gate at 86.7%, 52 of 60, measured as [concordance against blind reference scores](#how-answers-are-scored), not against human labels.
+
+**Quick links:** [Results](#results) · [Run the demo](#part-1-run-the-demo) · [The run data](#the-run-data) · [Full run](#part-2-run-the-full-project) · [Experimental design](#experimental-design) · [Limitations](#limitations)
+
+---
+
+## Try it in two minutes, no API key
+
+```bash
+git clone git@github.com:ojaswiat/ragbench-10k.git ragbench-10k
+cd ragbench-10k
+uv sync
+uv run python -m demo.main
+```
+
+That runs four questions through all three pipelines on one filing, on your CPU, with no account and no key. [Full detail below.](#part-1-run-the-demo)
+
+---
+
+## The research question
 
 The question is deliberately narrow. **When the source material is dense financial prose and tables, does the choice of retrieval strategy change the quality of the answer, and where does each strategy break down?**
 
 Generation is held fixed across all three pipelines. The same model answers every question with the same settings, so any difference in score comes from retrieval and nothing else.
 
----
-
-## The three pipelines
+### The three pipelines
 
 | ID | Paradigm | How it retrieves |
 |---|---|---|
@@ -16,35 +45,236 @@ Generation is held fixed across all three pipelines. The same model answers ever
 | `P2_bm25` | Statistical | Okapi BM25 with a custom tokeniser that keeps numbers, decimals, percentages and currency |
 | `P3_structural` | Structural | Walks a per-filing summary tree from root to leaf |
 
-- P2 has no model anywhere in its retrieval path, which keeps the semantic versus statistical contrast clean.
-- P1 gets no metadata filter and no section head start, so it cannot narrow the search before it begins.
-- P3 reuses a summary tree built once per filing, never rebuilt at query time.
+Design decisions worth knowing before you read the numbers:
 
-## The corpus and the question set
+- **P1** gets no metadata filter and no section head start, so it cannot narrow the search before it begins. The cross-encoder reranks the shortlist, which is why it is the slowest of the three to retrieve.
+- **P2** has no model anywhere in its retrieval path, which keeps the semantic versus statistical contrast clean. Its tokeniser deliberately preserves `$12,345`, `3.5`, `14.2%` and similar tokens that a stock tokeniser would split or drop. Whether that choice explains BM25's result is a reasonable hypothesis, **not something this benchmark establishes**: there is no tokeniser ablation here.
+- **P3** reuses a summary tree built once per filing, never rebuilt at query time. Retrieval walks root to leaf and returns the leaf summaries, not the original nodes.
 
-- **13 SEC 10-K filings**, five companies at uneven year depth: AAPL, MSFT and TSLA for FY2023 to FY2025, JPM and JNJ for FY2023 to FY2024.
-- Parsed into **18,297 nodes**, with tables kept whole rather than split across chunks.
-- **140 questions**, generated from the filings and then verified, split into three sets that never overlap:
-  - 100 primary questions, the ones actually scored.
-  - 20 golden questions, hand-labelled, used only to teach the judge.
-  - 20 judge-validation questions, used only to test the judge.
-- Questions sit in four quadrants, crossing factual against analytical and text-sourced against table-sourced.
-- The full run is **900 cells**: 100 questions x 3 pipelines x 3 values of K, each run once at temperature 0.
+### Architecture
 
-## How it is scored
+```mermaid
+flowchart LR
+  A["SEC EDGAR<br/>13 10-K filings"] --> B["LlamaParse<br/>atomic tables"]
+  B --> C[("benchmark.db<br/>18,297 nodes")]
+  C --> I1["P1 vector index<br/>ChromaDB"]
+  C --> I2["P2 BM25 index"]
+  C --> I3["P3 summary trees"]
+  C --> Q["140 questions<br/>generator + blind critic"]
+  Q --> R{"900 cells<br/>100 q x 3 pipelines x 3 K"}
+  I1 --> R
+  I2 --> R
+  I3 --> R
+  R --> G["Fixed generator<br/>llama-3.3-70b, temp 0"]
+  G --> J["Judge<br/>qwen3.6-27b"]
+  G --> M["Code metrics<br/>precision, recall, token-F1"]
+  J --> AN["Aggregation,<br/>figures, report"]
+  M --> AN
+```
+
+---
+
+## Results
+
+All 900 per-cell results ship in `results/benchmark-run.db` (648 KB), so every figure and table below regenerates on your machine in seconds. [How to use it.](#the-run-data)
+
+### Answer quality
+
+![Mean judge score and pass rate by pipeline. BM25 4.02 and vector 3.86 sit close together; structural trails at 1.88. Pass rates are 74.3%, 69.0% and 21.3%.](docs/figures/figure-5-1-answer-quality.png)
+
+*Figure 5.1. Mean judge score and pass rate, 300 cells per pipeline. Bars are means without intervals; the intervals are in Figure 5.6.*
+
+### Is the P1 versus P2 gap real?
+
+![Paired differences in judge score with 95% bootstrap intervals. Vector versus BM25 spans zero; both comparisons against structural sit far from zero.](docs/figures/figure-5-6-paired-comparisons.png)
+
+*Figure 5.6. Mean paired difference in judge score with 95% bootstrap intervals, paired on question and K.*
+
+| Comparison | Difference | 95% CI | W/L/T | p | Clears zero |
+|---|---|---|---|---|---|
+| P1_vector vs P2_bm25 | -0.160 | [-0.340, +0.013] | 27/42/231 | 9.12e-02 | no |
+| P1_vector vs P3_structural | +1.977 | [+1.743, +2.213] | 169/11/120 | 1.64e-37 | yes |
+| P2_bm25 vs P3_structural | +2.137 | [+1.897, +2.373] | 180/12/108 | 1.26e-39 | yes |
+
+Read the first row carefully. **This is "no significant difference at n=100", not "equal".** The interval's upper bound is +0.013, so it only just includes zero, and BM25 wins 42 of the 69 cells where the two disagree. A hundred questions cannot rule out a small real advantage to BM25. The honest claim is that a well-tokenised BM25 index is competitive with a dense retriever plus reranker on this material, not that the two are the same.
+
+### Cost against quality
+
+One row per pipeline, build cost and answer quality side by side. Build figures are one-off, measured on the full 13-filing corpus.
+
+| Pipeline | Judge | Pass rate | Recall@K | Build time | Build tokens | Index on disk | Model at build |
+|---|---|---|---|---|---|---|---|
+| `P2_bm25` | **4.02** | 74.3% | 0.706 | **under 1 s** | 0 | 7 MB | no |
+| `P1_vector` | 3.86 | 69.0% | 0.668 | 22 min | 0 | ~142 MB | no, local CPU |
+| `P3_structural` | 1.88 | 21.3% | 0.181 | **10.6 h** | 1.60M in, 892K out | 28 MB | yes |
+
+The pipeline that costs nothing to build scores highest. That is the uncomfortable part of this result, and it is the reason the benchmark is worth running.
+
+A note on the P3 token counts: they are a **floor** over 11 of the 13 filings. JPM_2023 and JPM_2024 were built before the token log recorded usage, so the true figure is higher.
+
+### The effect of retrieval depth
+
+![Judge score and recall against K for all three pipelines. All three rise from K=2 to K=5. BM25 reaches 4.23, vector 3.98, structural 2.16.](docs/figures/figure-5-3-effect-of-k.png)
+
+*Figure 5.3. Judge score and recall@K at K = 2, 3 and 5.*
+
+| Pipeline | K | Judge | Pass | Recall | Hit rate |
+|---|---|---|---|---|---|
+| `P1_vector` | 2 | 3.79 | 0.670 | 0.603 | 0.760 |
+| `P1_vector` | 3 | 3.80 | 0.670 | 0.664 | 0.800 |
+| `P1_vector` | 5 | 3.98 | 0.730 | 0.738 | 0.860 |
+| `P2_bm25` | 2 | 3.86 | 0.700 | 0.659 | 0.800 |
+| `P2_bm25` | 3 | 3.96 | 0.730 | 0.710 | 0.850 |
+| `P2_bm25` | 5 | **4.23** | **0.800** | 0.749 | 0.870 |
+| `P3_structural` | 2 | 1.63 | 0.150 | 0.111 | 0.130 |
+| `P3_structural` | 3 | 1.85 | 0.210 | 0.175 | 0.200 |
+| `P3_structural` | 5 | 2.16 | 0.280 | 0.258 | 0.290 |
+
+More context helps every pipeline. Between K = 2 and K = 5, BM25 gains 0.37 judge points against vector's 0.19, which is what widens the gap at K = 5. P3 gains the most in absolute terms, 0.53 points, but from so far back that K = 5 still leaves it below where the other two start at K = 2.
+
+### By question type
+
+Questions sit in four quadrants, crossing factual against analytical and text-sourced against table-sourced.
+
+| Quadrant | `P1_vector` | `P2_bm25` | `P3_structural` |
+|---|---|---|---|
+| Q1 Direct text | 4.47 | **4.80** | 1.95 |
+| Q2 Implicit text | 3.41 | **3.92** | 1.71 |
+| Q3 Direct table | 4.31 | **4.35** | 1.95 |
+| Q4 Implicit table | **3.24** | 3.00 | 1.92 |
+
+Mean judge score. The one quadrant where vector beats BM25 is Q4, analytical questions over tables, where the wording of the question is least likely to share tokens with the source. That is the shape you would predict, and it is also the only quadrant where BM25 falls as low as 3.00.
+
+### Where P3 breaks down
+
+The summary tree does not usually retrieve the wrong part of the filing. It retrieves roughly the right section and finds that the number has been summarised away. **In 214 of its 300 cells the answer was a variant of "the sources do not contain the answer",** against 60 for BM25 and 62 for vector.
+
+Two examples from the run, both at K = 5, both scored 1 by the judge:
+
+> **Q.** What was the number of full-time equivalent (FTE) positions for Johnson & Johnson as of December 31, 2023?
+> **Ground truth:** 131,900
+> **P3:** "The sources provided do not contain the answer to the question regarding the number of full-time equivalent (FTE) positions..."
+> **P2 on the same question:** "The number of full-time equivalent (FTE) positions for Johnson & Johnson as of December 31, 2023, was 131,900." Judge score 5.
+
+> **Q.** What is the total number of leased facilities internationally according to the table?
+> **Ground truth:** 22
+> **P3:** "The sources do not contain the answer."
+> **P1 and P2 on the same question:** both returned 22 from the correct node. Judge score 5 each.
+
+In both cases P3's cited nodes come from the right neighbourhood of the filing. The cell value simply did not survive summarisation. This is a finding about **this summarisation implementation**, not about tree retrieval as a family. A tree that kept leaf nodes verbatim, or that fell back to the source node once it reached a leaf, would be a different experiment.
+
+### A word on the latency column
+
+The two latency figures in this README measure **different things**, and neither is end to end.
+
+| Where it appears | What it measures | Typical values |
+|---|---|---|
+| Demo summary table | **Retrieval only**, wall clock around the retriever call | P2 0.02 s, P3 3.88 s, P1 4.94 s |
+| Full-run `lat` column | **Generation only**, wall clock around the answerer's LLM call | P2 6.18 s, P1 6.40 s, P3 6.87 s |
+
+That is why the full run shows all three within a second of each other: they share one generator on one provider, so that column is mostly measuring Groq, not the pipeline. The retrieval cost difference is real and large, and it is the demo column that shows it. If you want end-to-end numbers, add the two together, but be aware the generation half is network-bound and will move with provider load.
+
+---
+
+## The run data
+
+**Every number above ships with the repository.** You do not have to take any of them on trust, and you do not have to spend three weeks of free-tier quota to check them.
+
+`results/benchmark-run.db` is a 648 KB SQLite file holding the complete output of the run reported here:
+
+| Table | Rows | What it holds |
+|---|---|---|
+| `results` | 960 | Every benchmark cell: 900 scored PQ cells plus the 60 judge-gate rows. Retrieved and cited node IDs, the full answer text, all metrics, the judge score |
+| `queries` | 100 | The scored question set, with ground-truth answers and citations |
+| `golden_queries` | 20 | The labelled judge exemplars |
+| `judge_validation` | 20 | The gate question set |
+| `nodes` | 0 | Emptied. The 18,297-node store is 10 MB and rebuilds from step 1 |
+
+Point any analysis script at it with `--db`:
+
+```bash
+uv run python -m analysis.aggregate_results --db results/benchmark-run.db
+uv run python -m reporting.build_figures     --db results/benchmark-run.db
+uv run python -m reporting.build_report      --db results/benchmark-run.db
+```
+
+Or query it directly, which is often faster than reading a table:
+
+```bash
+sqlite3 results/benchmark-run.db \
+  "select pipeline, round(avg(judge_score),2) from results
+   where source_set='PQ' group by pipeline order by 2 desc"
+```
+
+### How reproducible is this, exactly?
+
+Two different questions get confused here, so it is worth separating them.
+
+**Re-analysing the shipped data is exact, not approximate.** The bootstrap is seeded, so the intervals do not wander between runs. Regenerating the six figures from `results/benchmark-run.db` reproduces the committed PNGs **byte for byte**, and every table in this README comes back identical. If you get a different number, something is wrong, and that is the point of shipping the file.
+
+**Re-running the benchmark from scratch is a different matter, and the change is more than slight.** Step 3 generates the question set with a model, so a fresh run writes a different 140 questions. The scores move with them, and the move is not a rounding wobble: absolute judge scores can shift by a few tenths of a point in either direction. What should survive is the *shape*, that P1 and P2 land close enough to be indistinguishable and P3 trails badly on anything depending on a value inside a table. Treat the headline numbers as specific to this question set, and the ordering as the finding.
+
+So: cite the numbers from the shipped data, and expect your own full rerun to differ.
+
+---
+
+## Experimental design
+
+| Item | Setting |
+|---|---|
+| Corpus | 13 SEC 10-K filings, 5 companies at uneven year depth: AAPL, MSFT and TSLA for FY2023 to FY2025, JPM and JNJ for FY2023 to FY2024 |
+| Parsing | LlamaParse in atomic-table mode, so a table is never cut in half. 18,297 nodes |
+| Question sets | 140 total, three disjoint sets: 100 primary (scored), 20 golden (judge exemplars only), 20 validation (judge gate only) |
+| Question types | Four quadrants: factual or analytical, crossed with text-sourced or table-sourced |
+| Retrieval depth | K in {2, 3, 5} |
+| Cells | 900 = 100 questions x 3 pipelines x 3 values of K |
+| Sampling | One run per cell, temperature 0, no repeated sampling |
+| What is held fixed | Generator model, prompt, temperature, question set, node store |
+| What varies | Retrieval, and nothing else |
+| What pipelines see | The question and their own retrieved nodes. No exemplars, no ground truth, no answer-location hints, no metadata pre-filter for P1 |
+| Judge gate | 60 validation outputs scored twice, blind to pipeline identity, must agree above 80%. Cleared at 86.7%, 52 of 60. Cross-model concordance, not human agreement |
+| Intervals | 95% bootstrap, paired on question and K. They describe variation across questions, not run-to-run variance |
+
+### How answers are scored
 
 Three pillars:
 
-1. **Retrieval**: precision@K, recall@K, evidence hit rate.
-2. **Answer quality**: a judge model scoring 1 to 5, backed by citation auditing, token-F1 and numeric exact match done in code.
-3. **Efficiency**: latency, tokens spent, and what it cost to build each index in the first place.
+1. **Retrieval:** precision@K, recall@K, evidence hit rate. Set arithmetic against stored ground-truth node IDs, no model involved.
+2. **Answer quality:** a judge model scoring 1 to 5, backed by citation auditing, token-F1 and numeric exact match done in code.
+3. **Efficiency:** latency, tokens spent, and what it cost to build each index in the first place.
 
-The judge has to earn its place before it grades anything. It scores 60 validation outputs against independently produced reference scores and must agree on more than 80% of them. It cleared at **86.7%**, 52 of 60. It sees only the five exemplars matching the question's quadrant, never all 20, and it has no search tool.
+The judge has to earn its place before it grades anything. It scores the 60 validation outputs, a second scorer scores the same 60 independently, and the two must agree on more than 80%. It cleared at **86.7%**, 52 of 60. The judge sees only the five exemplars matching the question's quadrant, never all 20, and it has no search tool.
 
-## Headline result
+**Be precise about what that 86.7% is.** The reference scores were produced by a model, not by a human, so the figure is **cross-model concordance, not human agreement**, and `judge_score` is not externally validated. What the gate does buy is independence, enforced structurally rather than by the scorer's good intentions:
 
-- **P1 and P2 cannot be told apart.** The paired difference is -0.160 judge points with a 95% interval of [-0.340, +0.013], which crosses zero. A well-tokenised BM25 index matches a dense retriever with a reranker on this material.
-- **P3 trails both by roughly two judge points**, with intervals nowhere near zero. Summarising up the tree loses the cell values and footnotes that table questions depend on.
+- **Evidence parity.** The reference scorer sees exactly the fields the judge sees. Ground-truth citations are withheld from both, so a disagreement cannot be an artefact of one side having better evidence.
+- **Pipeline blindness.** The pipeline name and the result ID that encodes it are stripped and replaced with opaque tokens. Rows are shuffled with a fixed seed first, because the natural sort order puts the same pipeline in every third row and position alone would leak it. A scorer who could tell an answer came from P3, the pipeline this project predicts will do worst, could shade the result it was meant to test.
+
+The 8 disagreements are worth reporting in full, because their shape matters more than the headline. **Every one is off by exactly one point**, and they fall on just three questions, hitting all three pipelines together on two of them:
+
+| Question | Pipelines affected | Judge | Reference |
+|---|---|---|---|
+| QT1_JEQ_001 | all three | 5 | 4 |
+| QT3_JEQ_003 | P2, P3 | 5, 2 | 4, 1 |
+| QT4_JEQ_001 | all three | 4 | 5 |
+
+The judge is the more generous scorer in 5 of the 8 and the stricter in 3, so there is no consistent leniency bias. More usefully, the disagreements cluster by **question**, not by pipeline: they are a handful of genuinely borderline items that both scorers found hard, rather than a systematic tilt for or against any one retrieval strategy. A bias that tracked pipeline identity would be fatal to the headline comparison. This one does not.
+
+The 60 gate rows are kept, so hand-scoring them later would upgrade the claim to real human validation without repeating any paid work.
+
+### Model routing, and why it is split
+
+Roles are pinned so that no model ever marks its own family's work.
+
+| Role | Model | Provider |
+|---|---|---|
+| Question generator | `nvidia/nemotron-3-super-120b-a12b:free` | OpenRouter |
+| Question critic | `openai/gpt-oss-20b:free` | OpenRouter |
+| P3 index build | `nvidia/nemotron-3-super-120b-a12b` | NVIDIA NIM |
+| Pipeline answerer | `llama-3.3-70b-versatile` | Groq |
+| Judge | `qwen/qwen3.6-27b` | Groq |
+
+This is a deliberate bias-mitigation choice, not an accident of what was free. The generator and the critic are different families, so a question is never checked by the model that wrote it. The answerer and the judge are different families, so an answer is never graded by the model that produced it. Without that separation, an LLM-judged benchmark measures family affinity as much as answer quality.
 
 ---
 
@@ -105,7 +335,7 @@ Reading the columns:
 
 - **Precision@3**: of the three nodes a pipeline returned, the fraction that were in the ground truth. Higher is better.
 - **Recall@3**: of the nodes the ground truth lists, the fraction the pipeline found. Higher is better.
-- **Mean latency**: average time to retrieve the evidence for one question.
+- **Mean latency**: average time to **retrieve** the evidence for one question. Retrieval only, no generation. See [the note on latency](#a-word-on-the-latency-column).
 
 What it tells you:
 
@@ -131,7 +361,7 @@ Four questions on one filing shows you the mechanism. It is not a finding. The f
 
 # Part 2: Run the full project
 
-This rebuilds the whole thing from nothing. It needs your own API keys, and it takes days rather than minutes.
+This rebuilds the whole thing from nothing. It needs your own API keys, and **it takes two to three weeks of intermittent running on free tiers**, because it is limited by daily token caps rather than by speed. Read [Reproducibility](#reproducibility) before you commit to it.
 
 ### What you need
 
@@ -151,6 +381,22 @@ cp .env.example .env
 
 All four services have a free tier. The project is built to stay inside them.
 
+### Hardware and disk
+
+- **Any modern laptop will do.** No GPU is needed or used. Embedding and reranking run on CPU through ONNX Runtime; everything expensive is somebody else's API.
+- **Allow about 2 GB of free disk**, measured on a completed run:
+
+| What | Size |
+|---|---|
+| Virtual environment | ~570 MB |
+| Cached model weights in `~/.cache/rag-techniques/` | up to ~1 GB |
+| Raw filings (`data/raw/`) | 90 MB |
+| Parsed markdown (`data/parsed/`) | 10 MB |
+| Indexes (`storage/`) | ~177 MB |
+| `benchmark.db` | 11 MB |
+
+- The run is network-bound, not compute-bound. You can leave it and come back.
+
 ### Read this before you start
 
 - **`LOCAL_TEST_THROTTLE` defaults to `true`.** While it is on, every stage stops after three items: three filings, three sections, three benchmark cells, three judge rows.
@@ -165,7 +411,7 @@ All four services have a free tier. The project is built to stay inside them.
 rm -rf benchmark.db benchmark.db-wal benchmark.db-shm storage artifacts
 ```
 
-Delete both or neither. Keeping `storage/` while deleting the database leaves a summary tree pointing at node IDs that no longer exist. Nothing here is precious: the demo rebuilds its own state the next time you run it.
+That command removes the database with its two sidecar files, then `storage/`, then `artifacts/`. **The database and `storage/` must go together, both or neither:** keeping `storage/` while deleting the database leaves a summary tree pointing at node IDs that no longer exist. `artifacts/` is unrelated to that rule. It holds only generated output, so you can delete it or keep it without affecting anything. Nothing here is precious: the demo rebuilds its own state the next time you run it.
 
 ---
 
@@ -195,9 +441,9 @@ These are very different jobs, and the difference is itself one of the results. 
 
 | Index | Time | Tokens | On disk | Uses a model |
 |---|---|---|---|---|
-| P1 vector | 22 minutes | 0 | 129 MB | No, local CPU |
+| P1 vector | 22 minutes | 0 | ~142 MB | No, local CPU |
 | P2 BM25 | under 1 second | 0 | 7 MB | No |
-| P3 summary tree | **10.6 hours** | 1.6M in, 892K out | 27 MB | Yes |
+| P3 summary tree | **10.6 hours** | 1.6M in, 892K out | 28 MB | Yes |
 
 - P3 is the only index allowed to call a model, and it runs once and is cached from then on.
 - It runs on NVIDIA NIM's free tier, which caps requests rather than tokens, so this bulk job does not eat the tighter daily token budget.
@@ -234,8 +480,8 @@ uv run python -m gate.score_gate_outputs       # the agreement check
 ```
 
 - Runs the 20 validation questions through all three pipelines at K = 5, giving 60 outputs.
-- Scores them twice, once by the judge and once independently, with neither seeing the other.
-- Reports the agreement rate. **It must be above 80%.**
+- Scores them twice, once by the judge and once by an independent reference scorer, with neither seeing the other and both blind to which pipeline produced the answer.
+- Reports the concordance rate. **It must be above 80%.** See [How answers are scored](#how-answers-are-scored) for what this does and does not prove.
 - If it fails, change the rubric or swap the judge model, then run it again.
 - **This gate exists to be cleared before step 6**, because step 6 is what spends the quota. Do not skip it.
 
@@ -248,7 +494,7 @@ uv run python -m benchmark.loop_executor
 - Runs all 900 cells: 100 questions x 3 pipelines x K in {2, 3, 5}.
 - Each cell runs once at temperature 0. No repeated sampling.
 - Every answer is scored by the judge and by the code metrics.
-- **Time**: two to three weeks of intermittent running on strict free tiers, because it is limited by daily token caps rather than by speed.
+- **Time**: two to three weeks of intermittent running on strict free tiers.
 - **It is safe to stop and restart.** The results table is unique on `(source_set, query_id, pipeline, k_value)`, so it reads back what it already saved and skips those cells. An interruption never costs you quota twice.
 
 ### Step 7. Aggregate and report
@@ -263,10 +509,11 @@ uv run python -m reporting.build_report
 - `build_figures` writes six charts to `artifacts/figures/`: answer quality, retrieval quality, the effect of K, the quadrant breakdown, the score distribution, and the paired comparisons.
 - `build_report` writes `artifacts/results-report.html`, one self-contained file with the figures embedded in it.
 - **Order matters here.** `build_figures` must run before `build_report`, because the report embeds the images it finds on disk rather than drawing them itself.
+- All three accept `--db`, so you can point them at the shipped `results/benchmark-run.db` instead of your own run. That is the quickest way to see what the output looks like before you commit to Part 2.
 
 ### What you get at the end
 
-`aggregate_results` prints five tables. These are the numbers from the original run:
+`aggregate_results` prints five tables. These are the numbers from the run reported in this README:
 
 ```
 ==============================================================================
@@ -286,7 +533,7 @@ judge_score   P1_vector vs P3_structural    +1.977  [+1.743, +2.213] 169/11/120 
 judge_score   P2_bm25 vs P3_structural      +2.137  [+1.897, +2.373] 180/12/108 1.26e-39  yes
 ```
 
-The other three tables are **BY K**, the same metrics split across K = 2, 3 and 5; **BY QUADRANT**, split across the four question types; and **INDEX BUILD COST**, the one-off time and tokens each index took to build.
+The other three tables are **BY K**, the same metrics split across K = 2, 3 and 5; **BY QUADRANT**, split across the four question types; and **INDEX BUILD COST**, the one-off time and tokens each index took to build. All three are reproduced in [Results](#results) above.
 
 Reading the columns:
 
@@ -296,7 +543,7 @@ Reading the columns:
 - **hit**: fraction of questions where at least one correct node was retrieved.
 - **cite**: fraction where the nodes the answer cited were all in the ground truth.
 - **tokF1**: token overlap between the answer and the reference answer.
-- **lat**: mean seconds per answer.
+- **lat**: mean seconds spent in the generator call. Not retrieval, and not end to end. See [the note on latency](#a-word-on-the-latency-column).
 - **diff**, **95% CI**, **W/L/T**, **p**, **sig**: the paired difference between two pipelines, its interval, win/loss/tie counts, the p-value, and whether the interval clears zero.
 
 `build_figures` then prints six lines:
@@ -318,11 +565,6 @@ wrote artifacts/results-report.html (952 KB)
 
 That last line is the end of the run. **The report is the deliverable**: open `artifacts/results-report.html` in a browser and you get the whole thing as one self-contained page, with all six figures embedded and the tables written out in prose.
 
-### What you will and will not reproduce
-
-- You **will not** get the exact numbers in this README. The question set is model-generated, so a fresh run writes a different 140 questions and the scores move with them.
-- You **should** get the same shape: P1 and P2 close enough to be indistinguishable, and P3 clearly behind on the table-sourced quadrants.
-
 ### Optional extras
 
 Hand-write the golden labels instead of using the committed set:
@@ -340,13 +582,35 @@ uv run python -m analysis.index_build_cost
 
 ---
 
+## Limitations
+
+Read these before quoting any number from this repository.
+
+- **Small corpus.** 13 filings from 5 companies in one sector-mixed slice of the US market. Nothing here transfers automatically to other document types, other languages, or a corpus large enough that retrieval becomes a needle-in-haystack problem.
+- **Model-generated questions.** The 140 questions were written by a model and checked by a second model, not by a financial analyst. They are verified against node IDs and values, which catches hallucinated citations, but it does not make them the questions a practitioner would ask.
+- **The question set changes on rerun.** A fresh run generates a different 140 questions, so your absolute scores will not match the ones here.
+- **One run per cell.** Every cell runs once at temperature 0. The intervals describe variation across questions, not run-to-run variance, and the benchmark cannot say anything about generator non-determinism.
+- **LLM-judge bias, and the gate is not human validation.** Scores come from a model, and so do the reference scores it was checked against. The 86.7% is cross-model concordance under blinding, not agreement with a human standard, so `judge_score` is not externally validated. The split model families and the blinding reduce the risk of a model grading its own work, but two models can agree and both be wrong in the same direction.
+- **Limited statistical power at n=100.** The P1 versus P2 interval is [-0.340, +0.013]. A hundred questions can detect a two-point gap easily and a 0.16-point gap not at all. Absence of evidence here is not evidence of absence.
+- **The P3 result is about this implementation.** It reflects one way of building and traversing a summary tree, where leaves are summaries rather than source nodes. It is not a verdict on tree-structured or hierarchical retrieval as a family. A tree that returned verbatim leaves would very likely score differently.
+- **Free-tier conditions.** Latency figures were taken on shared free-tier endpoints under rate limiting. Treat them as relative, not absolute.
+
+## Reproducibility
+
+- **Re-analysis is exact.** Everything in [Results](#results) regenerates byte for byte from `results/benchmark-run.db`, which ships with the repository. See [The run data](#the-run-data).
+- **A full rerun will not give the exact numbers in this README.** The question set is model-generated, so a fresh run writes a different 140 questions and the scores move with them, by a few tenths of a judge point rather than a rounding wobble.
+- **You should get the same shape:** P1 and P2 close enough to be indistinguishable, and P3 clearly behind, particularly on anything that depends on a value inside a table.
+- **The full run is the expensive part.** Two to three weeks of intermittent running against free-tier daily caps. Steps 1 to 5 are cheap and prove the chain works. If you only want the analysis, you do not need the rerun at all.
+- **Cost in money: zero.** Every provider used here has a free tier and the project is built to stay inside it. The cost is in wall-clock time and quota, not spend.
+- `data/filings_manifest.json` pins exactly which filings the corpus uses, so step 1 is deterministic even though the question set is not.
+
 ## Tests
 
 ```bash
 uv run pytest -q
 ```
 
-- A clean checkout gives **552 passed, 8 skipped**.
+- A clean checkout collects **560 tests: 552 pass and 8 are skipped by design.**
 - Six of the skips are calibration guards on the golden set. They have nothing to check until step 4 has run.
 - The other two make real network calls and stay skipped unless you set `RUN_LIVE_GROQ_TESTS=1`.
 
@@ -369,25 +633,13 @@ gate/                Scores the 60 gate outputs and reports agreement
 analysis/            Aggregation, quadrant breakdown, retrieval diagnostics,
                      evidence localisation, index build cost
 reporting/           The six figures, the HTML report, the findings page
+results/             benchmark-run.db, the complete per-cell output of the
+                     run reported in this README
 demo/                The zero-key demo, plus the node store and summary tree
                      it ships for its one filing
 scripts/             Backup, reload, answer-key repair
 tests/               560 tests
 ```
-
-## Model routing
-
-Roles are pinned so that no model ever marks its own family's work.
-
-| Role | Model | Provider |
-|---|---|---|
-| Question generator | `nvidia/nemotron-3-super-120b-a12b:free` | OpenRouter |
-| Question critic | `openai/gpt-oss-20b:free` | OpenRouter |
-| P3 index build | `nvidia/nemotron-3-super-120b-a12b` | NVIDIA NIM |
-| Pipeline answerer | `llama-3.3-70b-versatile` | Groq |
-| Judge | `qwen/qwen3.6-27b` | Groq |
-
-The generator and the critic are different families. The answerer and the judge are different families. That separation is what stops the evaluation marking its own homework.
 
 ## What is not in this repository
 
@@ -396,8 +648,28 @@ Generated files are left out to keep the repository small:
 - The raw and parsed filings under `data/`
 - The built indexes under `storage/`
 - Run logs
-- `benchmark.db` itself
+- The working `benchmark.db`, which carries the 18,297-node store
 
 All of them are rebuilt by the steps in Part 2, and `data/filings_manifest.json` pins exactly which filings the corpus uses.
 
+**The per-cell results are not among them.** They ship in `results/benchmark-run.db`, so every number in this README can be checked without running anything. See [The run data](#the-run-data).
+
 The one deliberate exception is `demo/assets/`, 2.3 MB holding the node store and summary tree for a single filing. Neither can be regenerated without a paid parse and a long run of model calls, and without them there would be nothing in this repository that a reader could actually run.
+
+## A note on naming
+
+The filing is a **10-K**, hyphenated and capitalised, which is how the SEC writes it. The repository is `ragbench-10k` in lower case because that is the convention for repository and package names. Both refer to the same thing.
+
+## Licence
+
+MIT. See [LICENSE](LICENSE).
+
+The SEC filings the benchmark runs on are US government publications and are in the public domain. The licence covers the code and the generated question set.
+
+## Contact
+
+Ojaswi Athghara
+
+- Email: [ojaswiat@gmail.com](mailto:ojaswiat@gmail.com)
+- GitHub: [github.com/ojaswiat](https://github.com/ojaswiat)
+- LinkedIn: [linkedin.com/in/ojaswiat](https://linkedin.com/in/ojaswiat)
