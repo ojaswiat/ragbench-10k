@@ -6,6 +6,8 @@
 
 **A controlled benchmark of three retrieval paradigms, vector, BM25 and summary-tree, over 13 SEC 10-K filings, with generation held fixed so only retrieval varies.**
 
+![RAGBench-10K: Benchmarking Vector, BM25 and Tree-Based Retrieval for RAG on SEC 10-K Filings](docs/figures/RAGBench-10K-Cover.png)
+
 ## TL;DR
 
 - **BM25 is statistically indistinguishable from a dense retriever plus reranker at this sample size.** BM25 scores 4.02 and vector 3.86 on a 1 to 5 judge scale. The paired difference is -0.160 with a 95% interval of [-0.340, +0.013], which crosses zero.
